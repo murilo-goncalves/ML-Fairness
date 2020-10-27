@@ -11,6 +11,8 @@ from yellowbrick.classifier import ClassificationReport, ConfusionMatrix, Precis
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 
+# TESTAR APENAS 8000 DADOS <= 50K, FAZER UM COMITÊ
+
 sns.set(style='whitegrid', color_codes=True, rc={'figure.figsize':(11.7,8.27)})
 
 df_adults = pd.read_csv("adult.data")
@@ -35,7 +37,7 @@ numerical = ['education-num', 'capital-gain', 'capital-loss', 'hours-per']
 
 # sns.pairplot(data=df_adults, hue='earnings', palette='gist_heat', dropna=True)
 # sns.boxplot(data=df_adults, x='earnings', y='age')
-# sns.countplot(x='sex', hue='earnings', data=df_adults)
+sns.countplot(x='earnings', data=df_adults)
 # df_adults[numerical].hist()
 # plt.show()
 
@@ -43,7 +45,7 @@ le = preprocessing.LabelEncoder()
 for i in range(9):
     df_adults[categorical[i]] = le.fit_transform(df_adults[categorical[i]])
 
-# df_adults.info()
+# print(df_adults.head())
 
 cols = [col for col in df_adults.columns if col is not "earnings"]
 data = df_adults[cols]
@@ -51,7 +53,7 @@ target = df_adults['earnings']
 data_train, data_test, target_train, target_test = train_test_split(data, target, test_size = 0.20, random_state = 10)
 
 
-logReg = LogisticRegression()
+logReg = KNeighborsClassifier()
 pred = logReg.fit(data_train, target_train).predict(data_test)
 
 print("Logistic Regression accuracy: ", accuracy_score(target_test, pred, normalize=True))

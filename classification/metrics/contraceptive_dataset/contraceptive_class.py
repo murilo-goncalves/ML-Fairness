@@ -27,16 +27,16 @@ df_contraceptive.columns = (["Wife's age",
 
 # df_contraceptive.hist()
 # sns.boxplot(x="Contraceptive method used", y="Wife's age", data=df_contraceptive)
-# plt.show()
+plt.show()
 
 cols = [col for col in df_contraceptive.columns if col is not "Contraceptive method used"]
 data = df_contraceptive[cols]
 target = df_contraceptive['Contraceptive method used']
 data_train, data_test, target_train, target_test = train_test_split(data, target, test_size = 0.20, random_state = 10)
 
-# data_train.info()
+data_train.info()
 
-logReg = KNeighborsClassifier()
+logReg = LogisticRegression()
 pred = logReg.fit(data_train, target_train).predict(data_test)
 
 print("Logistic Regression accuracy: ", accuracy_score(target_test, pred, normalize=True))

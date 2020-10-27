@@ -116,8 +116,12 @@ theta = np.zeros(params + 1)
 y_0 = np.array([1 if label == 0 else 0 for label in y])
 y_0 = np.reshape(y_0, (rows, 1))
 
+all_theta = one_vs_all(X, y, 10, 1)
+
 y_pred = predict_all(X, all_theta)
 correct = [1 if a == b else 0 for (a, b) in zip(y_pred, y)]
 accuracy = (sum(map(int, correct)) / float(len(correct)))
 
 print(f'accuracy = {accuracy*100}%')
+
+print(y_pred, y)

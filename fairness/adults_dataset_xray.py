@@ -13,12 +13,15 @@ def plot_correlation(df, categorical, attributes):
     df = df[attributes]
 
     corr = df.corr()
-    _, ax = plt.subplots(figsize=(size,size))
-    ax.grid(False)
-    ax.matshow(corr)
-    plt.xticks(range(len(corr.columns)),corr.columns)
-    plt.yticks(range(len(corr.columns)),corr.columns)
+    # _, ax = plt.subplots(figsize=(size,size))
+    #ax.grid(False)
+    #ax.matshow(corr)
+    #plt.xticks(range(len(corr.columns)),corr.columns)
+    #plt.yticks(range(len(corr.columns)),corr.columns)
+    sns.heatmap(corr, annot=True)
     plt.show()
+
+    
 
 def plot_count(df, attribute, hue=None):
     if (hue != None):
@@ -45,7 +48,7 @@ def relative_mean(df, catAttribute, numAttribute, isBothCat=False):
 def main():
     sns.set(style='whitegrid', color_codes=True, rc={'figure.figsize':(11.7,8.27)})
 
-    df = pd.read_csv("adults_dataset/adult.data")
+    df = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults_dataset\adult.data")
 
     df.columns = [ 'age',
                 'workclass',
@@ -69,8 +72,8 @@ def main():
     #                     'adult' if line < 60 else
     #                     'elderly' for line in df['age']]
 
-    categorical = [ 'workclass', 'marital-status', 'occupation', 'relationship', 'race', 'sex', 'native-country', 'earnings', 'capital-gain', 'age', 'education' ]
-    numerical = [ 'capital-loss', 'hours-per', 'education-num', 'fnlwgt' ]
+    categorical = [ 'workclass', 'marital-status', 'occupation', 'relationship', 'race', 'sex', 'native-country', 'earnings', 'capital-gain', 'education' ]
+    numerical = [ 'capital-loss', 'hours-per', 'education-num', 'fnlwgt', 'age' ]
 
     # relative_mean(df, 'sex', 'earnings', True)
     attributes = ['earnings', 'age', 'workclass', 'education-num', 'race', 'sex', 'native-country', 'hours-per']

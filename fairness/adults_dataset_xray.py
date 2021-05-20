@@ -79,6 +79,7 @@ def main():
     attributes = ['earnings', 'age', 'workclass', 'education-num', 'race', 'sex', 'native-country', 'hours-per']
     plot_correlation(df, categorical, attributes)
 
+    plot_count(df, "earnings")
 
 if (__name__ == '__main__'):
     main()

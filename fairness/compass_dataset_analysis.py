@@ -22,7 +22,7 @@ def main():
       (compas_scores_two_years['c_charge_degree'] != 'O') & 
       (compas_scores_two_years['score_text'] != 'N/A'))]
 
-    3#X-RAY
+    #X-RAY
     quant_race = compas_scores_two_years['race'].value_counts()
     quant_age = compas_scores_two_years['age'].value_counts()
     quant_score = compas_scores_two_years['score_text'].value_counts()
@@ -40,7 +40,7 @@ def main():
     plt.xlabel('Decile Score')
     plt.ylabel('Count')
 
-    3#LOGISTIC REGRESSION
+    #LOGISTIC REGRESSION
     categ_cols = ['score_text','age_cat','sex','race','c_charge_degree']
     compas_scores_two_years.loc[:,categ_cols] = compas_scores_two_years.loc[:,categ_cols].astype('category')
 

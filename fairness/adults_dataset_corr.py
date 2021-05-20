@@ -1,3 +1,4 @@
+from io import StringIO
 from imblearn.over_sampling._smote.base import SMOTENC
 import pandas as pd
 import seaborn as sns
@@ -5,6 +6,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 import numpy as np
 from sklearn import preprocessing, tree
+from sklearn.tree import export_graphviz
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from scipy.stats import chi2
@@ -12,6 +14,16 @@ from sklearn.metrics import classification_report,confusion_matrix,accuracy_scor
 from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+from collections import Counter
+import pydotplus
+from six import StringIO
+
+def plot_count(df, attribute, hue=None):
+    if (hue != None):
+        sns.countplot(x=attribute, data=df, hue=hue)
+    else:
+        sns.countplot(x=attribute, data=df)
+    plt.show()
 
 def subplot_categs(dfs, titles, category, fignum=1):
     plt.figure(fignum, figsize=(12, 6))
@@ -33,7 +45,7 @@ def subplot_categs(dfs, titles, category, fignum=1):
         plt.tight_layout()
 
 def main():
-    df = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults_dataset\adult.csv")
+    df = pd.read_csv(r"adults_dataset/adult.csv")
     df.columns = [ 'age',
                 'workclass',
                 'fnlwgt',
@@ -124,6 +136,13 @@ def main():
     print(confusion_matrix(y_test,predictions))
     print(accuracy_score(y_test,predictions))
 
+
+    dot_data = StringIO()
+    export_graphviz(clf, out_file=dot_data,
+                    filled=True, rounded=True,
+                    special_characters=True,feature_names = features,class_names=['0','1'])
+    graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
+    graph.write_png('arvore.png')
 
 if (__name__ == '__main__'):
     main()

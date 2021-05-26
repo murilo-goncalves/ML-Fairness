@@ -59,13 +59,15 @@ def one_hot_encoding(df):
 
 def normalization(df_encoded):
     columns_to_scale = ['age', 'capital-gain', 'capital-loss', 'hours-per']
-    mms = preprocessing.MinMaxScaler()
-    min_max_scaled_columns = mms.fit_transform(df_encoded[columns_to_scale])
+    scaler = preprocessing.MinMaxScaler()
+    min_max_scaled_columns = scaler.fit_transform(df_encoded[columns_to_scale])
 
     df_encoded['age'] = min_max_scaled_columns[:,0]
     df_encoded['capital-gain'] = min_max_scaled_columns[:,1]
     df_encoded['capital-loss'] = min_max_scaled_columns[:,2]
     df_encoded['hours-per'] = min_max_scaled_columns[:,3]
+
+    # df_encoded['age'] = scaler.inverse_transform(min_max_scaled_columns)[:, [0]]
 
 def split_samples(df_encoded):
     x = df_encoded.drop('earnings', axis=1)
@@ -76,7 +78,6 @@ def split_samples(df_encoded):
     x_train, y_train = smote.fit_resample(x_train, y_train)
 
     return {"x_train": x_train, "y_train": y_train, "x_test": x_test, "y_test": y_test}
-
 
 def tree_classifier(samples):
     dt = tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=8,max_depth=10)
@@ -111,16 +112,22 @@ def rich_proportions_of(attribute, samples, predictions):
     df["earnings"] = samples["y_test"]
     rich_with_attribute_before = df[(df[attribute] == 1) & (df["earnings"] == 1)]
     proportion_before = len(rich_with_attribute_before) / len(df[df["earnings"] == 1])
-    print(str(round(100 * proportion_before, 2)) + r"% of people with " + attribute + " earns more than 50K dollars per year, before training." )
+    print(str(round(100 * proportion_before, 2)) + r"% of people with " + attribute + " earn more than 50K dollars per year, before training." )
 
     df_after = copy(samples["x_test"])
     df_after["earnings"] = predictions
     rich_with_attribute_after = df_after[(df_after[attribute] == 1) & (df_after["earnings"] == 1)]
     proportion_after = len(rich_with_attribute_after) / len(df_after[df_after["earnings"] == 1])
-    print(str(round(100 * proportion_after, 2)) + r"% of people with " + attribute + " earns more than 50K dollars per year, after training." )
+    print(str(round(100 * proportion_after, 2)) + r"% of people with " + attribute + " earn more than 50K dollars per year, after training." )
+
+def rich_proportions_of_age(age_group, df):
+    df['age_group'] = pd.cut(df['age'],bins=[0, 25, 35, 60, 100],labels=['young','young-adult','adult','elderly'])
+    rich_with_attribute_before = df[(df["age_group"] == age_group) & (df["earnings"] == 1)]
+    proportion_before = len(rich_with_attribute_before) / len(df[df["earnings"] == 1])
+    print(str(round(100 * proportion_before, 2)) + r"% of people with " + age_group + " age earn more than 50K dollars per year, before training." )
 
 def main():
-    df = pd.read_csv(r"adults_dataset/adult.csv")
+    df = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults\adults_dataset\adult.csv")
     df.columns = [ 'age', 'workclass', 'fnlwgt', 'education', 'education-num', 'marital-status',
                    'occupation', 'relationship', 'race', 'sex', 'capital-gain', 'capital-loss', 
                    'hours-per', 'native-country', 'earnings' ]
@@ -128,23 +135,23 @@ def main():
     df = data_processing(df)
 
     df_encoded = one_hot_encoding(df)
+
+    rich_proportions_of_age('adult', df)
     
     normalization(df_encoded)
 
     samples = split_samples(df_encoded)
     
-
-
     # Decision tree
     dt = tree_classifier(samples)
-
+    
     # Random Forest
     # rf = random_forest_classifier(samples)
 
     predictions = predict(dt, samples)
 
     rich_proportions_of("sex_ Male", samples, predictions)
-
+    
 if (__name__ == '__main__'):
     main()
 

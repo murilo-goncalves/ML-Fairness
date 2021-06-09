@@ -1,19 +1,16 @@
+import sys
+
 from io import StringIO
-from os import name
 import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import numpy as np
 
 from sklearn import preprocessing, tree
 from sklearn.tree import export_graphviz
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report,confusion_matrix,accuracy_score
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 
-from collections import Counter
 import pydotplus
 from six import StringIO
 from copy import copy
@@ -25,7 +22,7 @@ def name_columns(df):
     return df
 
 def data_preprocessing(df):
-    df[df == ' ?'] = np.nan # Replace missing values by NAN values
+    df = df.replace(' ?', np.nan, inplace=False) # Replace missing values by NAN values
     df = df.dropna(axis=0) # Remove missing values
 
     df['earnings'].replace({' <=50K':0,' >50K':1},inplace=True)
@@ -36,56 +33,27 @@ def data_preprocessing(df):
 
     return df
 
-def fig_proportion_of_rich(df):
-    earnings_by_sex = df[["sex", "earnings"]].groupby("sex").mean()
-    plt.figure()
-    fig_earnings_by_sex = plt.bar(["Female", "Male"], earnings_by_sex.earnings)
-    plt.xlabel("Sex")
-    plt.ylabel("Proportion of high earners by sex")
+def fig_proportion_of_rich(df, attribute, show=False):
+    if (attribute == "age"):
+        df['age_group'] = pd.cut(df['age'],bins=[0, 25, 35, 60, 100],labels=['young','young-adult','adult','elderly'])
+        earnings= df[["age_group", "earnings"]].groupby("age_group").mean()
+        plt.bar(["Young", "Young-Adult", "Adult", "Elderly"], earnings.earnings)
+        df.drop('age_group', axis=1, inplace=True)
+
+    else:
+        earnings = df[[attribute, "earnings"]].groupby(attribute).mean()
+        
+        values = df[attribute].unique()
+        values = list(map(str, values))
+        values.sort()
+        plt.bar(values, earnings.earnings)
+
+    plt.xlabel(attribute)
+    plt.ylabel(f"Proportion of high earners by {attribute}")
     plt.title("Proportion of high earners")
 
-    earnings_by_race = df[["race", "earnings"]].groupby("race").mean()
-    plt.figure()
-    fig_earnings_by_race = plt.bar(["Amer-Indian-Eskimo", "Asian-Pac-Islander", "Black", "Other", "White"],
-                                 earnings_by_race.earnings)
-    plt.xlabel("Race")
-    plt.ylabel("Proportion of high earners by race")
-    plt.title("Proportion of high earners")
-
-    df['age_group'] = pd.cut(df['age'],bins=[0, 25, 35, 60, 100],labels=['young','young-adult','adult','elderly'])
-    earnings_by_age = df[["age_group", "earnings"]].groupby("age_group").mean()
-    plt.figure()
-    fig_earnings_by_age = plt.bar(["Young", "Young-Adult", "Adult", "Elderly"],
-                                 earnings_by_age.earnings)
-    plt.xlabel("Age group")
-    plt.ylabel("Proportion of high earners by age group")
-    plt.title("Proportion of high earners")
-
-    earnings_by_country = df[["native-country", "earnings"]].groupby("native-country").mean()
-    plt.figure()
-    fig_earnings_by_country = plt.bar(["Mexico", "Other", "United States"],
-                                 earnings_by_country.earnings)
-    plt.xlabel("Native country")
-    plt.ylabel("Proportion of high earners by native country")
-    plt.title("Proportion of high earners")
-
-    earnings_by_workclass = df[["workclass", "earnings"]].groupby("workclass").mean()
-    plt.figure()
-    fig_earnings_by_workclass = plt.bar(["Federal-gov", "Local-gov", "Private", "Self-emp-inc", "Self-emp-not-inc", "State-gov", "Without-pay"],
-                                 earnings_by_workclass.earnings)
-    plt.xlabel("Workclass")
-    plt.ylabel("Proportion of high earners by workclass")
-    plt.title("Proportion of high earners")
-
-    earnings_by_relationship = df[["relationship", "earnings"]].groupby("relationship").mean()
-    plt.figure()
-    fig_earnings_by_relationship = plt.bar(["Husband", "Not-in-family", "Other-relative", "Own-child", "Unmarried", "Wife"],
-                                 earnings_by_relationship.earnings)
-    plt.xlabel("Relationship")
-    plt.ylabel("Proportion of high earners by relationship")
-    plt.title("Proportion of high earners")
-
-    # plt.show()
+    if (show):
+        plt.show()
 
 def numerical_correlation(df):
     numerical = ['age','capital-loss','capital-gain','hours-per']
@@ -128,8 +96,6 @@ def normalization(df_encoded):
     df_encoded['capital-loss'] = min_max_scaled_columns[:,2]
     df_encoded['hours-per'] = min_max_scaled_columns[:,3]
 
-    # df_encoded['age'] = scaler.inverse_transform(min_max_scaled_columns)[:, [0]]
-
 def split_samples(df_train, df_test):
     x_train = df_train.drop('earnings', axis=1)
     y_train = df_train['earnings']
@@ -171,13 +137,13 @@ def proportion_of_rich(attribute, samples, predictions):
     df = copy(samples["x_test"])
     df["earnings"] = samples["y_test"]
     rich_with_attribute_before = df[(df[attribute] == 1) & (df["earnings"] == 1)]
-    proportion_before = len(rich_with_attribute_before) / len(df["earnings"])
+    proportion_before = len(rich_with_attribute_before) / len(df[(df[attribute] == 1)])
     print(str(round(100 * proportion_before, 2)) + r"% of people with " + attribute + " earn more than 50K dollars per year, before training." )
 
     df_after = copy(samples["x_test"])
     df_after["earnings"] = predictions
     rich_with_attribute_after = df_after[(df_after[attribute] == 1) & (df_after["earnings"] == 1)]
-    proportion_after = len(rich_with_attribute_after) / len(df_after["earnings"])
+    proportion_after = len(rich_with_attribute_after) / len(df[(df[attribute] == 1)])
     print(str(round(100 * proportion_after, 2)) + r"% of people with " + attribute + " earn more than 50K dollars per year, after training." )
 
 def demographic_parity( df_test_encoded, predictions):
@@ -187,17 +153,16 @@ def demographic_parity( df_test_encoded, predictions):
     print(f"Demographic parity difference: {dpd:.3f}")
     print(f"Demographic parity ratio: {dpr:.3f}")
 
-def main():
-    df_data = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults\adults_dataset\adult_train.csv")
+def main(argv):
+    df_data = pd.read_csv(r"adults_dataset/adult_train.csv")
     df_data = name_columns(df_data)
-    df_test = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults\adults_dataset\adult_test.csv")
+    df_test = pd.read_csv(r"adults_dataset/adult_test.csv")
     df_test = name_columns(df_test)
 
     df_data = data_preprocessing(df_data)
     df_test = data_preprocessing(df_test)
 
-    # fig_proportion_of_rich(df_data)
-    earnings_by_sex = df_data[["sex", "earnings"]].groupby("sex").mean()
+    fig_proportion_of_rich(df_test, argv[1], True)
 
     df_data_encoded = one_hot_encoding(df_data)
     df_test_encoded = one_hot_encoding(df_test)
@@ -210,14 +175,14 @@ def main():
     # # Decision tree
     # dt = tree_classifier(samples)
     
-    # # Random Forest
+    # Random Forest
     rf = random_forest_classifier(samples)
 
     predictions = predict(rf, samples, False)
 
-    # proportion_of_rich("sex", samples, predictions)
+    proportion_of_rich(argv[2], samples, predictions)
 
 
 if (__name__ == '__main__'):
-    main()
+    main(sys.argv)
 

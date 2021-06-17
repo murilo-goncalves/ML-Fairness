@@ -11,9 +11,12 @@ from sklearn.tree import export_graphviz
 from sklearn.metrics import classification_report,confusion_matrix,accuracy_score
 from sklearn.ensemble import RandomForestClassifier
 
-import pydotplus
-from six import StringIO
-from copy import copy
+from fairlearn.metrics import (
+    demographic_parity_difference,
+    demographic_parity_ratio,
+    equalised_odds_difference,
+    equalised_odds_ratio,
+)
 
 def name_columns(df):
     df.columns =  [ 'age', 'workclass', 'fnlwgt', 'education', 'education-num', 'marital-status', 
@@ -105,11 +108,6 @@ def split_samples(df_train, df_test):
  
     return {"x_train": x_train, "y_train": y_train, "x_test": x_test, "y_test": y_test}
 
-def tree_classifier(samples):
-    dt = tree.DecisionTreeClassifier(criterion='entropy',min_samples_split = 8,max_depth = 10)
-    dt.fit(samples["x_train"],samples["y_train"])
-    return dt
-
 def random_forest_classifier(samples):
     rf = RandomForestClassifier(min_samples_split=30)
     rf.fit(samples["x_train"],samples["y_train"])
@@ -125,14 +123,6 @@ def predict(model, samples, print_=False):
     
     return predictions
 
-def save_tree_to_image(dt):
-    dot_data = StringIO()
-    export_graphviz(dt, out_file=dot_data,
-                    filled=True, rounded=True,
-                    special_characters=True,feature_names = features,class_names=['0','1'])
-    graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
-    graph.write_png('arvore.png')
-
 def proportion_of_rich(attribute, samples, predictions):
     df = copy(samples["x_test"])
     df["earnings"] = samples["y_test"]
@@ -146,23 +136,43 @@ def proportion_of_rich(attribute, samples, predictions):
     proportion_after = len(rich_with_attribute_after) / len(df[(df[attribute] == 1)])
     print(str(round(100 * proportion_after, 2)) + r"% of people with " + attribute + " earn more than 50K dollars per year, after training." )
 
-def demographic_parity( df_test_encoded, predictions):
-    dpd = demographic_parity_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
-    dpr = demographic_parity_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
+def demographic_parity(df_test_encoded, df_test, predictions, print_=False):
+    dpd_sex = demographic_parity_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
+    dpr_sex = demographic_parity_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
 
-    print(f"Demographic parity difference: {dpd:.3f}")
-    print(f"Demographic parity ratio: {dpr:.3f}")
+    dpd_race = demographic_parity_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test.race)
+    dpr_race = demographic_parity_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test.race)
+
+    if (print_):
+        print(f"Demographic parity difference sex: {dpd_sex:.3f}")
+        print(f"Demographic parity ratio sex: {dpr_sex:.3f}")
+        print(f"Demographic parity difference race: {dpd_race:.3f}")
+        print(f"Demographic parity ratio race: {dpr_race:.3f}")
+
+def equalised_odds(df_test_encoded, df_test, predictions, print_=False):
+    eod_sex = equalised_odds_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
+    eor_sex = equalised_odds_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
+
+    eod_race = equalised_odds_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test.race)
+    eor_race = equalised_odds_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test.race)
+
+    if (print_):
+        print(f"equalised odds difference sex: {eod_sex:.3f}")
+        print(f"equalised odds ratio sex: {eor_sex:.3f}")
+        print(f"equalised odds difference race: {eod_race:.3f}")
+        print(f"equalised odds ratio race: {eor_race:.3f}")
+
 
 def main(argv):
-    df_data = pd.read_csv(r"adults_dataset/adult_train.csv")
+    df_data = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults\adults_dataset\adult_train.csv")
     df_data = name_columns(df_data)
-    df_test = pd.read_csv(r"adults_dataset/adult_test.csv")
+    df_test = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults\adults_dataset\adult_test.csv")
     df_test = name_columns(df_test)
 
     df_data = data_preprocessing(df_data)
     df_test = data_preprocessing(df_test)
 
-    fig_proportion_of_rich(df_test, argv[1], True)
+    # fig_proportion_of_rich(df_test, argv[1], False)
 
     df_data_encoded = one_hot_encoding(df_data)
     df_test_encoded = one_hot_encoding(df_test)
@@ -171,17 +181,15 @@ def main(argv):
     normalization(df_test_encoded)
 
     samples = split_samples(df_data_encoded, df_test_encoded)
-
-    # # Decision tree
-    # dt = tree_classifier(samples)
     
-    # Random Forest
     rf = random_forest_classifier(samples)
 
     predictions = predict(rf, samples, False)
 
-    proportion_of_rich(argv[2], samples, predictions)
+    # proportion_of_rich(argv[2], samples, predictions)
 
+    demographic_parity(df_test_encoded, df_test, predictions, False)
+    equalised_odds(df_test_encoded, df_test, predictions, True)
 
 if (__name__ == '__main__'):
     main(sys.argv)

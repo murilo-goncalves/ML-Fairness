@@ -1,22 +1,28 @@
 import sys
 
-from io import StringIO
 import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import numpy as np
 
-from sklearn import preprocessing, tree
-from sklearn.tree import export_graphviz
+from sklearn import preprocessing
 from sklearn.metrics import classification_report,confusion_matrix,accuracy_score
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 
 from fairlearn.metrics import (
     demographic_parity_difference,
     demographic_parity_ratio,
-    equalised_odds_difference,
-    equalised_odds_ratio,
+    equalized_odds_difference,
+    equalized_odds_ratio,
+    true_positive_rate,
+    false_positive_rate,
+    true_negative_rate,
+    false_negative_rate
 )
+
+from aif360.algorithms.preprocessing.reweighing import Reweighing
+from aif360.datasets import StandardDataset
 
 def name_columns(df):
     df.columns =  [ 'age', 'workclass', 'fnlwgt', 'education', 'education-num', 'marital-status', 
@@ -109,9 +115,9 @@ def split_samples(df_train, df_test):
     return {"x_train": x_train, "y_train": y_train, "x_test": x_test, "y_test": y_test}
 
 def random_forest_classifier(samples):
-    rf = RandomForestClassifier(min_samples_split=30)
-    rf.fit(samples["x_train"],samples["y_train"])
-    return rf
+    model = RandomForestClassifier(min_samples_split=30)
+    model.fit(samples["x_train"],samples["y_train"])
+    return model
 
 def predict(model, samples, print_=False):
     predictions = model.predict(samples["x_test"])
@@ -123,45 +129,92 @@ def predict(model, samples, print_=False):
     
     return predictions
 
-def proportion_of_rich(attribute, samples, predictions):
+def proportion_of_rich(attribute, samples, predictions, print_=False):
     df = copy(samples["x_test"])
     df["earnings"] = samples["y_test"]
     rich_with_attribute_before = df[(df[attribute] == 1) & (df["earnings"] == 1)]
     proportion_before = len(rich_with_attribute_before) / len(df[(df[attribute] == 1)])
-    print(str(round(100 * proportion_before, 2)) + r"% of people with " + attribute + " earn more than 50K dollars per year, before training." )
-
+    
     df_after = copy(samples["x_test"])
     df_after["earnings"] = predictions
     rich_with_attribute_after = df_after[(df_after[attribute] == 1) & (df_after["earnings"] == 1)]
     proportion_after = len(rich_with_attribute_after) / len(df[(df[attribute] == 1)])
-    print(str(round(100 * proportion_after, 2)) + r"% of people with " + attribute + " earn more than 50K dollars per year, after training." )
 
-def demographic_parity(df_test_encoded, df_test, predictions, print_=False):
+    if print_:
+        print(str(round(100 * proportion_before, 2)) + r"% of people with " + attribute + " earn more than 50K dollars per year, before training." )
+        print(str(round(100 * proportion_after, 2)) + r"% of people with " + attribute + " earn more than 50K dollars per year, after training." )
+
+def gender_performance(df_test_encoded, predictions, print_=False):
+    predictions_m = []
+    predictions_f = []
+    df_test_encoded_m = []
+    df_test_encoded_f = []
+    tamanho = len(df_test_encoded['sex'])
+
+    for i in range(tamanho):
+        if df_test_encoded['sex'].iloc[i] == 1:
+            df_test_encoded_m.append(df_test_encoded['earnings'].iloc[i])
+            predictions_m.append(predictions[i])
+        else:
+            df_test_encoded_f.append(df_test_encoded['earnings'].iloc[i])
+            predictions_f.append(predictions[i])
+  
+
+    true_positive_m = true_positive_rate(df_test_encoded_m, predictions_m, pos_label=1)
+    false_positive_m = false_positive_rate(df_test_encoded_m, predictions_m, pos_label=1)
+    true_negative_m = true_negative_rate(df_test_encoded_m, predictions_m, pos_label=1)
+    false_negative_m = false_negative_rate(df_test_encoded_m, predictions_m, pos_label=1)
+
+    true_positive_f = true_positive_rate(df_test_encoded_f, predictions_f, pos_label=1)
+    false_positive_f = false_positive_rate(df_test_encoded_f, predictions_f, pos_label=1)
+    true_negative_f = true_negative_rate(df_test_encoded_f, predictions_f, pos_label=1)
+    false_negative_f = false_negative_rate(df_test_encoded_f, predictions_f, pos_label=1)
+
+    if print_:
+        print("True Positive Rate for Male:", true_positive_m)
+        print("True Positive Rate for Female:", true_positive_f)
+        print("False Positive Rate for Male:", false_positive_m)
+        print("False Positive Rate for Female:", false_positive_f)
+        print("True Negative Rate for Male:", true_negative_m)
+        print("True Negative Rate for Female:", true_negative_f)
+        print("False Negative Rate for Male:", false_negative_m)
+        print("False Negative Rate for Female:", false_negative_f)
+
+def demographic_parity(df_test_encoded, predictions, print_=False):
     dpd_sex = demographic_parity_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
     dpr_sex = demographic_parity_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
 
-    dpd_race = demographic_parity_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test.race)
-    dpr_race = demographic_parity_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test.race)
-
     if (print_):
-        print(f"Demographic parity difference sex: {dpd_sex:.3f}")
-        print(f"Demographic parity ratio sex: {dpr_sex:.3f}")
-        print(f"Demographic parity difference race: {dpd_race:.3f}")
-        print(f"Demographic parity ratio race: {dpr_race:.3f}")
+        print(f"Demographic parity difference sex:", dpd_sex)
+        print(f"Demographic parity ratio sex:", dpr_sex)
 
-def equalised_odds(df_test_encoded, df_test, predictions, print_=False):
-    eod_sex = equalised_odds_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
-    eor_sex = equalised_odds_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
-
-    eod_race = equalised_odds_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test.race)
-    eor_race = equalised_odds_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test.race)
+def equalized_odds(df_test_encoded, predictions, print_=False):
+    eod_sex = equalized_odds_difference(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
+    eor_sex = equalized_odds_ratio(df_test_encoded.earnings, predictions, sensitive_features=df_test_encoded.sex)
 
     if (print_):
         print(f"equalised odds difference sex: {eod_sex:.3f}")
         print(f"equalised odds ratio sex: {eor_sex:.3f}")
-        print(f"equalised odds difference race: {eod_race:.3f}")
-        print(f"equalised odds ratio race: {eor_race:.3f}")
 
+def split_samples_fair(train_sds, test_sds, test_sds_pred):
+    x_train_fair = train_sds.features
+    y_train_fair = train_sds.labels
+    x_test_fair = test_sds_pred.features
+    y_test_fair = test_sds.labels
+
+    
+    return {"x_train": x_train_fair, "y_train": y_train_fair, "x_test": x_test_fair, "y_test": y_test_fair}
+
+def logistic_regression(samples):
+    lireg = LogisticRegression(max_iter=10000) # initialize the model
+    lireg.fit(samples["x_train"],samples["y_train"]) # fit he model
+    return lireg
+
+def predict_fair(model, samples, print_=False):
+    predictions = model.predict_proba(samples["x_test"])[:, 1]
+    test_pred = predictions > 0.5
+  
+    return predictions, test_pred
 
 def main(argv):
     df_data = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults\adults_dataset\adult_train.csv")
@@ -182,14 +235,43 @@ def main(argv):
 
     samples = split_samples(df_data_encoded, df_test_encoded)
     
-    rf = random_forest_classifier(samples)
+    model = random_forest_classifier(samples)
 
-    predictions = predict(rf, samples, False)
+    predictions = predict(model, samples, False)
 
-    # proportion_of_rich(argv[2], samples, predictions)
+    # proportion_of_rich(argv[2], samples, predictions, False)
 
-    demographic_parity(df_test_encoded, df_test, predictions, False)
-    equalised_odds(df_test_encoded, df_test, predictions, True)
+    gender_performance(df_test_encoded, predictions, False)
+    demographic_parity(df_test_encoded, predictions, False)
+    equalized_odds(df_test_encoded, predictions, False)
+
+    #Kamiran and Calders
+    train_sds = StandardDataset(df_data_encoded, label_name="earnings", favorable_classes=[1], 
+                                protected_attribute_names=["sex"], privileged_classes=[[1]])
+                                
+
+    test_sds = StandardDataset(df_test_encoded, label_name="earnings", favorable_classes=[1],
+                               protected_attribute_names=["sex"], privileged_classes=[[1]])
+
+    privileged_groups = [{"sex": 1.0}]
+    unprivileged_groups = [{"sex": 0.0}]
+
+    RW = Reweighing(unprivileged_groups=unprivileged_groups, privileged_groups=privileged_groups)
+    RW.fit(train_sds)
+
+    test_sds_pred = test_sds.copy(deepcopy=True)
+
+    samples_fair = split_samples_fair(train_sds, test_sds, test_sds_pred)
+    
+    model_fair = logistic_regression(samples_fair)
+
+    predictions_fair, test_pred = predict_fair(model_fair, samples_fair, True)
+    test_pred = test_pred.astype(int)
+
+    dpd = demographic_parity_difference(
+        df_test_encoded.earnings, test_pred, sensitive_features=df_test_encoded.sex)
+
+    print(f"Model demographic parity difference:", dpd)
 
 if (__name__ == '__main__'):
     main(sys.argv)

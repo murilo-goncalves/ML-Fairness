@@ -15,6 +15,8 @@ https://arxiv.org/pdf/1802.06309.pdf
 Sobre Adults dataset:
 https://imrehg.github.io/cdei-development/
 
+https://towardsdatascience.com/reweighing-the-adult-dataset-to-make-it-discrimination-free-44668c9379e8
+
 Biblioteca:
 https://fairlearn.org
 

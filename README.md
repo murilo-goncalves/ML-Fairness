@@ -2,7 +2,7 @@
 Academic studies in Machine Learning and Fairness
 
 Sobre Fairness:
-https://fairmlclass.github.io/
+https://fairmlbook.org/
 
 https://towardsdatascience.com/a-tutorial-on-fairness-in-machine-learning-3ff8ba1040cb
 

@@ -198,17 +198,18 @@ def equalized_odds(df_test_encoded, predictions, print_=False):
 
 def split_samples_fair(train_sds, test_sds, test_sds_pred):
     x_train_fair = train_sds.features
-    y_train_fair = train_sds.labels
+    y_train_fair = train_sds.labels.flatten()
     x_test_fair = test_sds_pred.features
-    y_test_fair = test_sds.labels
+    y_test_fair = test_sds.labels.flatten()
 
-    
     return {"x_train": x_train_fair, "y_train": y_train_fair, "x_test": x_test_fair, "y_test": y_test_fair}
 
-def logistic_regression(samples):
-    lireg = LogisticRegression(max_iter=10000) # initialize the model
-    lireg.fit(samples["x_train"],samples["y_train"]) # fit he model
-    return lireg
+def logistic_regression(test_sds_transf):
+    x = test_sds_transf.features
+    y = test_sds_transf.labels.flatten()
+    loreg = LogisticRegression(max_iter=10000) # initialize the model
+    loreg.fit(x, y, sample_weight=test_sds_transf.instance_weights) # fit the model
+    return loreg
 
 def predict_fair(model, samples, print_=False):
     predictions = model.predict_proba(samples["x_test"])[:, 1]
@@ -217,9 +218,9 @@ def predict_fair(model, samples, print_=False):
     return predictions, test_pred
 
 def main(argv):
-    df_data = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults\adults_dataset\adult_train.csv")
+    df_data = pd.read_csv(r"adults_dataset/adult_train.csv")
     df_data = name_columns(df_data)
-    df_test = pd.read_csv(r"C:\Users\marin\Desktop\UNICAMP\IC\ML-Fairness\fairness\adults\adults_dataset\adult_test.csv")
+    df_test = pd.read_csv(r"adults_dataset/adult_test.csv")
     df_test = name_columns(df_test)
 
     df_data = data_preprocessing(df_data)
@@ -241,14 +242,13 @@ def main(argv):
 
     # proportion_of_rich(argv[2], samples, predictions, False)
 
-    gender_performance(df_test_encoded, predictions, False)
-    demographic_parity(df_test_encoded, predictions, False)
-    equalized_odds(df_test_encoded, predictions, False)
+    gender_performance(df_test_encoded, predictions)
+    demographic_parity(df_test_encoded, predictions)
+    equalized_odds(df_test_encoded, predictions)
 
     #Kamiran and Calders
     train_sds = StandardDataset(df_data_encoded, label_name="earnings", favorable_classes=[1], 
                                 protected_attribute_names=["sex"], privileged_classes=[[1]])
-                                
 
     test_sds = StandardDataset(df_test_encoded, label_name="earnings", favorable_classes=[1],
                                protected_attribute_names=["sex"], privileged_classes=[[1]])
@@ -260,10 +260,11 @@ def main(argv):
     RW.fit(train_sds)
 
     test_sds_pred = test_sds.copy(deepcopy=True)
+    test_sds_transf = RW.transform(test_sds)
 
     samples_fair = split_samples_fair(train_sds, test_sds, test_sds_pred)
     
-    model_fair = logistic_regression(samples_fair)
+    model_fair = logistic_regression(test_sds_transf)
 
     predictions_fair, test_pred = predict_fair(model_fair, samples_fair, True)
     test_pred = test_pred.astype(int)
